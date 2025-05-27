@@ -164,4 +164,3 @@ if __name__ == '__main__':
         app.all_patients_data = MOCK_PARSED_PATIENTS # Ensure it's set before tests run if run directly
     unittest.main(argv=['first-arg-is-ignored'], exit=False)
 
-```

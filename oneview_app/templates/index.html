@@ -110,7 +110,7 @@
                         {% endif %}
 
                         <h4>Behavioral Health Diagnoses:</h4>
-                        {% set behavioral_diagnoses = selected_patient.diagnoses|selectattr('category', 'neitherequalto', 'encounter-diagnosis')|selectattr('category', 'neitherequalto', 'problem-list-item')|list %}
+                        {% set behavioral_diagnoses = selected_patient.diagnoses|selectattr('category', 'ne', 'encounter-diagnosis')|selectattr('category', 'ne', 'problem-list-item')|list %}
                         {# This is a simple filter; actual behavioral health categories might differ #}
                         {% if behavioral_diagnoses %}
                             <ul>
@@ -133,4 +133,3 @@
     </div>
 </body>
 </html>
-dummy change

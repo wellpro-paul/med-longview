@@ -261,4 +261,3 @@ if __name__ == "__main__":
     #     for diag in specific_patient.get('diagnoses', []):
     #         print(f"  - {diag.get('description')} (Code: {diag.get('code')}, Status: {diag.get('status')})")
 
-```
