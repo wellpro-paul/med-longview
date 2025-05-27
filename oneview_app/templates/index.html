@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneView - {{ selected_patient.full_name if selected_patient else 'Patient Search' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <header>
+                <h1>OneView</h1>
+            </header>
+            <nav class="search-navigation">
+                <form method="POST" action="/" class="search-form">
+                    <input type="text" name="search_query" placeholder="Search Patient ID or Name" value="{{ search_query if search_query and not selected_patient else '' }}">
+                    <input type="submit" value="Search">
+                </form>
+
+                {% if not selected_patient and patients %}
+                    <section class="search-results-summary">
+                        <h2>Search Results ({{ num_results }} found)</h2>
+                    </section>
+                    <ul class="search-results-list">
+                        {% for patient in patients %}
+                            <li><a href="/?patient_id={{ patient.patient_id }}">{{ patient.full_name or 'N/A' }} (ID: {{ patient.patient_id or 'N/A' }})</a></li>
+                        {% endfor %}
+                    </ul>
+                {% elif not selected_patient and request.method == 'POST' and not patients %}
+                    <section class="search-results-summary">
+                        <p class="no-results">No patients found matching: "{{ search_query }}"</p>
+                    </section>
+                {% elif not selected_patient %}
+                    <section class="search-results-summary">
+                        <p class="no-results">Use the search bar to find patients.</p>
+                    </section>
+                {% endif %}
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            {% if selected_patient %}
+                <header class="page-navigation">
+                    <a href="/" class="back-link">&larr; Back to Search Results</a>
+                </header>
+                <article class="patient-detail-view">
+                    <header class="patient-header">
+                        <h2>{{ selected_patient.full_name or 'N/A' }}</h2>
+                        <p>
+                            DOB: {{ selected_patient.dob or 'N/A' }} 
+                            {% if patient_age is not none %} (Age: {{ patient_age }}) {% endif %}
+                            | Gender: {{ selected_patient.gender or 'N/A' }}
+                        </p>
+                    </header>
+
+                    <section class="module demographics-module">
+                        <h3>Comprehensive Demographics</h3>
+                        <p><strong>Health Plan:</strong> {{ selected_patient.insurance or 'N/A' }}</p>
+                        <p><strong>Primary Care Provider (PCP):</strong> {{ selected_patient.pcp_name or 'N/A' }}</p>
+                        <p><strong>Contact Phone:</strong> {{ selected_patient.contact_phone or 'N/A' }}</p>
+                        <p><strong>Date of Last Wellness Visit:</strong> N/A (Data not available)</p>
+                        <p><strong>MRN#:</strong> {{ selected_patient.patient_id or 'N/A' }} (Using Patient ID as MRN)</p>
+                    </section>
+
+                    <section class="module care-management-module">
+                        <h3>Care Management</h3>
+                        <p><strong>Assigned Care Manager:</strong> N/A (Data not available)</p>
+                        <h4>Recent Visits/Encounters:</h4>
+                        {% if selected_patient.recent_encounters %}
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Facility</th>
+                                        <th>Provider</th>
+                                        <th>Primary Diagnosis</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for encounter in selected_patient.recent_encounters[:5] %} {# Display up to 5 recent encounters #}
+                                        <tr>
+                                            <td>{{ encounter.date or 'N/A' }}</td>
+                                            <td>{{ encounter.type or 'N/A' }}</td>
+                                            <td>{{ encounter.facility or 'N/A' }}</td>
+                                            <td>{{ encounter.provider or 'N/A' }}</td>
+                                            <td>{{ encounter.primary_diagnosis_text or 'N/A' }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p>No recent encounters found.</p>
+                        {% endif %}
+                    </section>
+
+                    <section class="module diagnosis-module">
+                        <h3>Diagnosis Module</h3>
+                        <h4>Medical Diagnoses:</h4>
+                        {% set medical_diagnoses = selected_patient.diagnoses|selectattr('category', 'equalto', 'encounter-diagnosis')|list + selected_patient.diagnoses|selectattr('category', 'equalto', 'problem-list-item')|list %}
+                        {% if medical_diagnoses %}
+                            <ul>
+                                {% for diagnosis in medical_diagnoses %}
+                                    <li>{{ diagnosis.description or 'N/A' }} (Code: {{ diagnosis.code or 'N/A' }}, Status: {{ diagnosis.status or 'N/A' }})</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>No medical diagnoses recorded.</p>
+                        {% endif %}
+
+                        <h4>Behavioral Health Diagnoses:</h4>
+                        {% set behavioral_diagnoses = selected_patient.diagnoses|selectattr('category', 'neitherequalto', 'encounter-diagnosis')|selectattr('category', 'neitherequalto', 'problem-list-item')|list %}
+                        {# This is a simple filter; actual behavioral health categories might differ #}
+                        {% if behavioral_diagnoses %}
+                            <ul>
+                                {% for diagnosis in behavioral_diagnoses %}
+                                    <li>{{ diagnosis.description or 'N/A' }} (Code: {{ diagnosis.code or 'N/A' }}, Status: {{ diagnosis.status or 'N/A' }})</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>No specific behavioral health diagnoses recorded (other than encounter/problem list).</p>
+                        {% endif %}
+                    </section>
+                </article>
+            {% else %}
+                <section class="welcome-message no-results">
+                    <h2>Welcome to OneView</h2>
+                    <p>Please use the search bar on the left to find a patient by ID or name. Click on a patient in the search results to view their detailed information.</p>
+                </section>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>
+dummy change
