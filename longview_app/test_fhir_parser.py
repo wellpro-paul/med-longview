@@ -1,7 +1,7 @@
 import unittest
 import json
 import os
-from oneview_app.fhir_parser import parse_fhir_bundle, load_all_patients_data, DATA_DIR
+from longview_app.fhir_parser import parse_fhir_bundle, load_all_patients_data, DATA_DIR
 
 # --- Mock FHIR Data ---
 MOCK_PATIENT_BUNDLE_FULL = {

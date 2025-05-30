@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request
-from oneview_app.fhir_parser import load_all_patients_data
+from longview_app.fhir_parser import load_all_patients_data
 from datetime import datetime
 
 app = Flask(__name__)
