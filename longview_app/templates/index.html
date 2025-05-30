@@ -59,6 +59,9 @@
                         <p><strong>Health Plan:</strong> {{ selected_patient.insurance or 'N/A' }}</p>
                         <p><strong>Primary Care Provider (PCP):</strong> {{ selected_patient.pcp_name or 'N/A' }}</p>
                         <p><strong>Contact Phone:</strong> {{ selected_patient.contact_phone or 'N/A' }}</p>
+                        <p><strong>Full Address:</strong> {{ selected_patient.address_full or 'N/A' }}</p>
+                        <p><strong>Marital Status:</strong> {{ selected_patient.marital_status or 'N/A' }}</p>
+                        <p><strong>Preferred Language:</strong> {{ selected_patient.preferred_language or 'N/A' }}</p>
                         <p><strong>Date of Last Wellness Visit:</strong> N/A (Data not available)</p>
                         <p><strong>MRN#:</strong> {{ selected_patient.patient_id or 'N/A' }} (Using Patient ID as MRN)</p>
                     </section>
@@ -68,10 +71,20 @@
                         <p><strong>Assigned Care Manager:</strong> N/A (Data not available)</p>
                         <h4>Recent Visits/Encounters:</h4>
                         {% if selected_patient.recent_encounters %}
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                        <th>
+                                            <a href="{{ url_for('index', patient_id=selected_patient.patient_id, sort_by='date', sort_order='asc' if current_sort_by == 'date' and current_sort_order == 'desc' else 'desc') }}">
+                                                Date
+                                                {% if current_sort_by == 'date' %}
+                                                    {% if current_sort_order == 'desc' %}<span class="sort-arrow">&#9660;</span>{# ▼ #}
+                                                    {% else %}<span class="sort-arrow">&#9650;</span>{# ▲ #}
+                                                    {% endif %}
+                                                {% endif %}
+                                            </a>
+                                        </th>
                                         <th>Type</th>
                                         <th>Facility</th>
                                         <th>Provider</th>
@@ -79,7 +92,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for encounter in selected_patient.recent_encounters[:5] %} {# Display up to 5 recent encounters #}
+                                    {% for encounter in selected_patient.recent_encounters %}
                                         <tr>
                                             <td>{{ encounter.date or 'N/A' }}</td>
                                             <td>{{ encounter.type or 'N/A' }}</td>
@@ -90,6 +103,7 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
+                        </div>
                         {% else %}
                             <p>No recent encounters found.</p>
                         {% endif %}
@@ -120,6 +134,38 @@
                             </ul>
                         {% else %}
                             <p>No specific behavioral health diagnoses recorded (other than encounter/problem list).</p>
+                        {% endif %}
+                    </section>
+
+                    <section class="module medications-module">
+                        <h3>Medications</h3>
+                        {% if selected_patient.medications %}
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Medication Name</th>
+                                            <th>Prescribing Date</th>
+                                            <th>Prescriber</th>
+                                            <th>Dosage</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for med in selected_patient.medications %}
+                                            <tr>
+                                                <td>{{ med.name or 'N/A' }}</td>
+                                                <td>{{ med.authored_on or 'N/A' }}</td>
+                                                <td>{{ med.prescriber or 'N/A' }}</td>
+                                                <td>{{ med.dosage or 'N/A' }}</td>
+                                                <td>{{ med.status or 'N/A' }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p>No medications listed.</p>
                         {% endif %}
                     </section>
                 </article>

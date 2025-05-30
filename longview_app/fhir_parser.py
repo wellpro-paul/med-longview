@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime
+import logging
 
 # Constants for FHIR resource types and codes
 PATIENT_RESOURCE_TYPE = "Patient"
@@ -9,6 +10,8 @@ ENCOUNTER_RESOURCE_TYPE = "Encounter"
 CONDITION_RESOURCE_TYPE = "Condition"
 PCP_CODE = "PCP"  # Primary Care Provider code
 PRIMARY_CARE_PHYSICIAN_CODE = "primaryCarePhysician"
+MEDICATION_REQUEST_RESOURCE_TYPE = "MedicationRequest"
+MEDICATION_RESOURCE_TYPE = "Medication"
 
 # Define the path to the FHIR data directory
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "synthea_sample_data_fhir_latest")
@@ -173,17 +176,138 @@ def parse_diagnoses(condition_resources):
         diagnoses_data.append(condition_info)
     return diagnoses_data
 
+def parse_address(patient_resource):
+    """Parses the patient's home address."""
+    if not patient_resource or not patient_resource.get("address"):
+        return None
+    
+    home_address = None
+    for addr in patient_resource.get("address", []):
+        if addr.get("use") == "home":
+            home_address = addr
+            break
+    
+    if not home_address: # If no 'home' address, take the first one available
+        home_address = patient_resource.get("address", [])[0] if patient_resource.get("address") else None
+
+    if not home_address:
+        return None
+
+    parts = [
+        ", ".join(home_address.get("line", [])), # Join multiple lines if they exist
+        home_address.get("city"),
+        home_address.get("state"),
+        home_address.get("postalCode"),
+        home_address.get("country")
+    ]
+    return ", ".join(p for p in parts if p and p.strip()) # Filter out None or empty parts
+
+def parse_marital_status(patient_resource):
+    """Parses the patient's marital status."""
+    marital_status_data = patient_resource.get("maritalStatus")
+    if not marital_status_data:
+        return None
+    
+    if marital_status_data.get("text"):
+        return marital_status_data["text"]
+    if marital_status_data.get("coding"):
+        coding = marital_status_data["coding"][0] # Assuming first coding is primary
+        if coding.get("display"):
+            return coding["display"]
+    return None
+
+def parse_preferred_language(patient_resource):
+    """Parses the patient's preferred language."""
+    communications = patient_resource.get("communication", [])
+    if not communications:
+        return None
+
+    preferred_comm = None
+    for comm in communications:
+        if comm.get("preferred") is True:
+            preferred_comm = comm
+            break
+    
+    if not preferred_comm and communications: # If no 'preferred', take the first one
+        preferred_comm = communications[0]
+
+    if not preferred_comm or not preferred_comm.get("language"):
+        return None
+        
+    language_data = preferred_comm["language"]
+    if language_data.get("text"):
+        return language_data["text"]
+    if language_data.get("coding"):
+        coding = language_data["coding"][0] # Assuming first coding is primary
+        if coding.get("display"):
+            return coding["display"]
+    return None
+
+def parse_medications(bundle_data):
+    """Parses medication data from MedicationRequest and Medication resources."""
+    medication_resources = {}
+    for entry in bundle_data.get("entry", []):
+        resource = entry.get("resource", {})
+        if resource.get("resourceType") == MEDICATION_RESOURCE_TYPE:
+            med_id = entry.get("fullUrl") or f"urn:uuid:{resource.get('id')}"
+            if med_id:
+                 medication_resources[med_id] = resource
+
+    parsed_med_requests = []
+    med_request_entries = get_resource_entries(bundle_data, MEDICATION_REQUEST_RESOURCE_TYPE)
+
+    for med_request in med_request_entries:
+        med_info = {
+            "name": None,
+            "authored_on": med_request.get("authoredOn"),
+            "prescriber": med_request.get("requester", {}).get("display"),
+            "dosage": med_request.get("dosageInstruction", [{}])[0].get("text"),
+            "status": med_request.get("status")
+        }
+
+        med_codeable_concept = med_request.get("medicationCodeableConcept")
+        med_reference = med_request.get("medicationReference")
+
+        if med_codeable_concept:
+            med_info["name"] = med_codeable_concept.get("text")
+            if not med_info["name"] and med_codeable_concept.get("coding"):
+                med_info["name"] = med_codeable_concept["coding"][0].get("display")
+        elif med_reference:
+            ref_str = med_reference.get("reference")
+            if ref_str in medication_resources:
+                linked_med_resource = medication_resources[ref_str]
+                if linked_med_resource.get("code", {}).get("text"):
+                    med_info["name"] = linked_med_resource["code"]["text"]
+                elif linked_med_resource.get("code", {}).get("coding"):
+                    med_info["name"] = linked_med_resource["code"]["coding"][0].get("display")
+                else:
+                    med_info["name"] = "Unknown (Name not found in referenced Medication)"
+                    logging.warning(f"Medication name not found in referenced Medication resource: {ref_str} for MedicationRequest {med_request.get('id', 'N/A')}")
+
+            else:
+                med_info["name"] = med_reference.get("display") or f"Unknown (Reference {ref_str} not found)"
+                logging.warning(f"MedicationReference {ref_str} not found in bundle for MedicationRequest {med_request.get('id', 'N/A')}")
+        
+        if not med_info["name"]:
+            med_info["name"] = "Unknown Medication"
+            logging.warning(f"Could not determine medication name for MedicationRequest {med_request.get('id', 'N/A')}")
+
+        parsed_med_requests.append(med_info)
+    return parsed_med_requests
+
 def parse_fhir_bundle(bundle_data):
     """Parses a single FHIR patient bundle."""
-    patient_resource = get_resource_entries(bundle_data, PATIENT_RESOURCE_TYPE)
-    if not patient_resource:
-        return None # Or raise an error if a patient resource is always expected
-    patient_resource = patient_resource[0] # Assuming one patient per bundle
+    patient_resource_list = get_resource_entries(bundle_data, PATIENT_RESOURCE_TYPE)
+    if not patient_resource_list:
+        bundle_id = bundle_data.get("id", "Unknown Bundle ID")
+        logging.warning(f"No Patient resource found in bundle: {bundle_id}")
+        return None 
+    patient_resource = patient_resource_list[0]
 
     coverage_resources = get_resource_entries(bundle_data, COVERAGE_RESOURCE_TYPE)
     encounter_resources = get_resource_entries(bundle_data, ENCOUNTER_RESOURCE_TYPE)
     condition_resources = get_resource_entries(bundle_data, CONDITION_RESOURCE_TYPE)
-
+    
     parsed_patient = {
         "patient_id": patient_resource.get("id"),
         "full_name": parse_patient_name(patient_resource),
@@ -192,8 +316,12 @@ def parse_fhir_bundle(bundle_data):
         "insurance": parse_insurance_info(coverage_resources),
         "pcp_name": parse_pcp_name(patient_resource, encounter_resources),
         "contact_phone": parse_contact_info(patient_resource),
+        "address_full": parse_address(patient_resource),
+        "marital_status": parse_marital_status(patient_resource),
+        "preferred_language": parse_preferred_language(patient_resource),
         "recent_encounters": parse_recent_encounters(encounter_resources),
         "diagnoses": parse_diagnoses(condition_resources),
+        "medications": parse_medications(bundle_data),
     }
     return parsed_patient
 
